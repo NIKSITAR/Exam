@@ -1,0 +1,26 @@
+# Скомпилированные файлы
+*.o
+*.obj
+*.exe
+*.app
+*.out
+
+# Qt временные файлы
+*.pro.user
+moc_*
+qrc_*
+ui_*
+Makefile
+Makefile.*
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Исключения для LFS файлов
+!*.MOV
+!*.mov
+!*.mp4
+!*.avi
