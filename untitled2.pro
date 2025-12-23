@@ -1,5 +1,5 @@
 QT       += core gui
-QT += multimediawidgets
+QT       += multimediawidgets datavisualization
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -11,13 +11,16 @@ CONFIG += c++17
 
 SOURCES += \
     main.cpp \
-    widget.cpp
+    widget.cpp \
+    widget3d.cpp
 
 HEADERS += \
-    widget.h
+    widget.h \
+    widget3d.h
 
 FORMS += \
-    widget.ui
+    widget.ui \
+    widget3d.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

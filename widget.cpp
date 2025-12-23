@@ -1,4 +1,5 @@
 #include "widget.h"
+#include "widget3d.h"
 #include <QDebug>
 #include <QDir>
 #include <QTimer>
@@ -88,17 +89,43 @@ Widget::Widget(QWidget *parent)
     txtCurrentRoll->setTransform(t1);
     rollRov->setTransformOriginPoint(rollRov->pixmap().width()/2, rollRov->pixmap().height()/2);
 
+    QWidget *parentContainer = pos3D->parentWidget();
+
+    int index = gridLayout->indexOf(pos3D);
+    int row, column, rowSpan, columnSpan;
+
+    gridLayout->getItemPosition(index, &row, &column, &rowSpan, &columnSpan);
+    gridLayout->removeWidget(pos3D);
+    delete pos3D;
+
+    Widget3D *threeDWidget = new Widget3D(parentContainer);
+
+    gridLayout->addWidget(threeDWidget, row, column, rowSpan, columnSpan);
     QTimer *videoTimer = new QTimer(this);
+
+    rovSeries = threeDWidget->pointROV;
+    dsSeries = threeDWidget->pointDS;
+    data << QVector3D(2.0f, 2.0f, 2.0f);
+    rovSeries->dataProxy()->resetArray(&data);
 
     connect(videoTimer, &QTimer::timeout, this, [this]() {
         if (player->playbackState() == QMediaPlayer::PlayingState && flagMarker == 1) {
             timeCounter += 0.05;
+
             a = 10.0 * qSin(timeCounter);
             txtCurrentPitch->setPlainText(QString::number(a, 'f', 1) + "°");
             pitchRov->setRotation(-a);
+
             a = 5.0 * qSin(timeCounter);
             txtCurrentRoll->setPlainText(QString::number(a, 'f', 1) + "°");
             rollRov->setRotation(-a);
+
+            float rovX = 2.0f - 0.5f * qSin(timeCounter * 0.3f);
+            float rovY = 2.0f  - 0.5f * qCos(timeCounter * 0.3f);
+            float rovZ = 2.0f  - 0.3f * timeCounter;
+
+            data << QVector3D(rovX, rovY, rovZ);
+            rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(rovX, rovY, rovZ)));
         }
     });
 
@@ -107,6 +134,7 @@ Widget::Widget(QWidget *parent)
     connect(nextVideo, &QPushButton::clicked, [this](){
         if (n < k) n += 1;
         timeCounter = 0.0;
+        rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
         numberVideo->setText(QString::number(n) + "/" + QString::number(k));
         player->setSource(QUrl(folder + QString::number(n) + ".MOV"));
         player->play();
@@ -116,6 +144,7 @@ Widget::Widget(QWidget *parent)
     connect(prevVideo, &QPushButton::clicked, [this](){
         if (n > 1) n -= 1;
         timeCounter = 0.0;
+        rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
         numberVideo->setText(QString::number(n) + "/" + QString::number(k));
         player->setSource(QUrl(folder + QString::number(n) + ".MOV"));
         player->play();
@@ -152,6 +181,15 @@ Widget::Widget(QWidget *parent)
         k = fileSize(folder);
         player->stop();
         player->setSource(QUrl(folder + QString::number(1) + ".MOV"));
+        timeCounter = 0.0;
+        a = 0.0;
+        txtCurrentPitch->setPlainText("0.0°");
+        txtCurrentRoll->setPlainText("0.0°");
+        pitchRov->setRotation(0);
+        rollRov->setRotation(0);
+        markerBtn->setEnabled(false);
+        markerBtn->setText("Marker");
+        rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
     });
 
     connect(markerBtn, &QPushButton::clicked, [this](){
@@ -160,24 +198,46 @@ Widget::Widget(QWidget *parent)
         k = fileSize(folder);
         player->stop();
         player->setSource(QUrl(folder + QString::number(1) + ".MOV"));
+        timeCounter = 0.0;
+        a = 0.0;
+        txtCurrentPitch->setPlainText("0.0°");
+        txtCurrentRoll->setPlainText("0.0°");
+        pitchRov->setRotation(0);
+        rollRov->setRotation(0);
+        rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
     });
+
+
+    markerBtn->setEnabled(false);
+    markerBtn->setText("Marker");
 
     connect(player, &QMediaPlayer::mediaStatusChanged, this, [this](QMediaPlayer::MediaStatus status) {
         if (status == QMediaPlayer::EndOfMedia && flagMarker == 0)
         {
-            valueRMS->setText("0,6 Хороший результат");
+            markerBtn->setEnabled(true);
+            markerBtn->setText("Marker");
+
+            valueRMS->setText("Калибровка завершена: RMS = 0.6 (отлично)");
+        }
+        else if (status == QMediaPlayer::EndOfMedia && flagMarker == 1)
+        {
+            valueRMS->setText("Обработка маркера завершен");
         }
     });
 
     connect(player, &QMediaPlayer::playbackStateChanged, this, [this](QMediaPlayer::PlaybackState state) {
         if (state == QMediaPlayer::PlayingState && flagMarker == 0)
         {
-            valueRMS->setText("Вычисление ошибки...");
+            valueRMS->setText("Выполняется калибровка...");
+        }
+        else if (state == QMediaPlayer::PlayingState && flagMarker == 1)
+        {
+            valueRMS->setText("Обработка маркера...");
         }
     });
 
     Video->show();
-
+    qDebug() << Video->size();
 }
 
 Widget::~Widget() {}
@@ -185,8 +245,6 @@ Widget::~Widget() {}
 int Widget::fileSize(QString folder)
 {
     QDir dir(folder);
-
     QStringList items = dir.entryList(QDir::NoDotAndDotDot | QDir::AllEntries);
-
     return items.count();
 }
