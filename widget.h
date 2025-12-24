@@ -26,7 +26,7 @@ public:
     int fileSize(QString folder);
     int k;
     int flagMarker = 0;
-    int startFlag = 1;
+    int endVideo = 1;
     int videoSize = 0;
     int videoTime = 0;
     int markerPressCount = 0;

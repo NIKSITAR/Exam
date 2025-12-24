@@ -114,7 +114,8 @@ Widget::Widget(QWidget *parent)
 
     QTimer *videoTimer = new QTimer(this);
 
-    connect(videoTimer, &QTimer::timeout, this, [this]() {
+    connect(videoTimer, &QTimer::timeout, this, [this]()
+    {
         if (player->playbackState() == QMediaPlayer::PlayingState && flagMarker == 1) {
             timeCounter += 0.05;
 
@@ -139,8 +140,10 @@ Widget::Widget(QWidget *parent)
 
     // Обработка нажатия кнопки следующего видео
 
-    connect(nextVideo, &QPushButton::clicked, [this](){
+    connect(nextVideo, &QPushButton::clicked, [this]()
+    {
         if (n < k) n += 1;
+        else n = 1;
         timeCounter = 0.0;
         rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
         numberVideo->setText(QString::number(n) + "/" + QString::number(k));
@@ -151,8 +154,10 @@ Widget::Widget(QWidget *parent)
 
     // Обработка нажатия кнопки предыдущего видео
 
-    connect(prevVideo, &QPushButton::clicked, [this](){
+    connect(prevVideo, &QPushButton::clicked, [this]()
+    {
         if (n > 1) n -= 1;
+        else n = k;
         timeCounter = 0.0;
         rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
         numberVideo->setText(QString::number(n) + "/" + QString::number(k));
@@ -163,41 +168,52 @@ Widget::Widget(QWidget *parent)
 
     // Обработка нажатия кнопки старт
 
-    connect(startBtn, &QPushButton::clicked,[this](){
-        startFlag = 1;
+    connect(startBtn, &QPushButton::clicked,[this]()
+    {
         numberVideo->setText(QString::number(n) + "/" + QString::number(k));
-        txtCurrentPitch->setPlainText("0.0°");
-        txtCurrentRoll->setPlainText("0.0°");
-        pitchRov->setRotation(0);
-        rollRov->setRotation(0);
+        if (endVideo == 1)
+        {
+            endVideo = 0;
+            timeCounter = 0.0;
+            rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
+            txtCurrentPitch->setPlainText("0.0°");
+            txtCurrentRoll->setPlainText("0.0°");
+            pitchRov->setRotation(0);
+            rollRov->setRotation(0);
+        }
         player->play();
         player->setVideoOutput(Video);
     });
 
     // Обработка нажатия кнопки стоп
 
-    connect(stopBtn, &QPushButton::clicked,[this](){
+    connect(stopBtn, &QPushButton::clicked,[this]()
+    {
         player->pause();
     });
 
     // Обработка слайдера
 
-    connect(player, &QMediaPlayer::metaDataChanged, [this]() {
+    connect(player, &QMediaPlayer::metaDataChanged, [this]()
+    {
         horizontalSlider->setSliderPosition(0);
         horizontalSlider->setMaximum(player->duration());
     });
 
-    connect(player, &QMediaPlayer::positionChanged, [this]() {
+    connect(player, &QMediaPlayer::positionChanged, [this]()
+    {
         horizontalSlider->setSliderPosition(player->position());
     });
 
-    connect(horizontalSlider, &QSlider::sliderMoved, [this]() {
+    connect(horizontalSlider, &QSlider::sliderMoved, [this]()
+    {
         player->setPosition(horizontalSlider->sliderPosition());
     });
 
     // Обработка нажатия кнопки режима калибровки
 
-    connect(calibBtn, &QPushButton::clicked, [this](){
+    connect(calibBtn, &QPushButton::clicked, [this]()
+    {
         flagMarker = 0;
         folder= "Calib/";
         k = fileSize(folder);
@@ -216,7 +232,8 @@ Widget::Widget(QWidget *parent)
 
     // Обработка нажатия кнопки режима маркера
 
-    connect(markerBtn, &QPushButton::clicked, [this](){
+    connect(markerBtn, &QPushButton::clicked, [this]()
+    {
         flagMarker = 1;
         folder = "Marker/";
         k = fileSize(folder);
@@ -237,7 +254,8 @@ Widget::Widget(QWidget *parent)
 
     // Выводим статус видео по завершении
 
-    connect(player, &QMediaPlayer::mediaStatusChanged, this, [this](QMediaPlayer::MediaStatus status) {
+    connect(player, &QMediaPlayer::mediaStatusChanged, this, [this](QMediaPlayer::MediaStatus status)
+    {
         if (status == QMediaPlayer::EndOfMedia && flagMarker == 0)
         {
             markerBtn->setEnabled(true);
@@ -247,13 +265,15 @@ Widget::Widget(QWidget *parent)
         }
         else if (status == QMediaPlayer::EndOfMedia && flagMarker == 1)
         {
+            endVideo = 1;
             valueRMS->setText("Обработка маркера завершена");
         }
     });
 
     // Выводим статус видео при проигрывании
 
-    connect(player, &QMediaPlayer::playbackStateChanged, this, [this](QMediaPlayer::PlaybackState state) {
+    connect(player, &QMediaPlayer::playbackStateChanged, this, [this](QMediaPlayer::PlaybackState state)
+    {
         if (state == QMediaPlayer::PlayingState && flagMarker == 0)
         {
             valueRMS->setText("Выполняется калибровка...");
