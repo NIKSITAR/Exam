@@ -11,9 +11,12 @@ Widget3D::Widget3D(QWidget *parent)
 {
     setupUi(this);
     graph = new Q3DScatter();
+
+    // Тема для кастомизации области графа
+
     Q3DTheme *theme = new Q3DTheme();
     theme->setBackgroundColor(QColor(0, 150, 255, 200));
-    theme->setWindowColor(QColor(0, 200, 255, 0));
+    theme->setWindowColor(QColor(0, 102, 204, 0));
     theme->setLabelTextColor(QColor(0, 0, 0));
     theme->setLabelBackgroundColor(QColor(0, 200, 255));
     graph->setActiveTheme(theme);
@@ -21,7 +24,6 @@ Widget3D::Widget3D(QWidget *parent)
     QWidget *container = QWidget::createWindowContainer(graph);
 
     QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(container);
 
     pointDS = new QScatter3DSeries();
@@ -30,8 +32,8 @@ Widget3D::Widget3D(QWidget *parent)
     pointDS->setBaseColor(Qt::blue);
     pointROV->setBaseColor(Qt::red);
 
-    pointDS->setItemSize(0.1f);
-    pointROV->setItemSize(0.1f);
+    pointDS->setItemSize(0.2f);
+    pointROV->setItemSize(0.2f);
 
     graph->addSeries(pointDS);
     graph->addSeries(pointROV);

@@ -9,6 +9,8 @@ Widget::Widget(QWidget *parent)
 {
     setupUi(this);
 
+    // Создаем задний фон
+
     QImageReader::setAllocationLimit(256);
     QPixmap pix("land.png");
     pix = pix.scaled(this->size(), Qt::KeepAspectRatioByExpanding);
@@ -16,16 +18,15 @@ Widget::Widget(QWidget *parent)
     palette.setBrush(QPalette::Window, pix);
     this->setPalette(palette);
 
-    player = new QMediaPlayer;
+    player = new QMediaPlayer;  // наш плейер
 
-    k = fileSize(folder);
+    k = fileSize(folder);       // кол-во файлов в папке
 
     numberVideo->setText(QString::number(n) + "/" + QString::number(k));
-    numberVideo->baseSize();
 
     player->setSource(QUrl(folder + QString::number(n) + ".MOV"));
 
-    // формируем шкалу крена и дифферента и добавляем картинки аппарата
+    // Формируем отображение крена и дифферента и добавляем картинки аппарата
     // PITCH
 
     scene1 = new QGraphicsScene(pitchView);
@@ -89,24 +90,29 @@ Widget::Widget(QWidget *parent)
     txtCurrentRoll->setTransform(t1);
     rollRov->setTransformOriginPoint(rollRov->pixmap().width()/2, rollRov->pixmap().height()/2);
 
+    // Подключение виджета 3Д положения ПА относительно док-станции
+
     QWidget *parentContainer = pos3D->parentWidget();
 
     int index = gridLayout->indexOf(pos3D);
     int row, column, rowSpan, columnSpan;
 
     gridLayout->getItemPosition(index, &row, &column, &rowSpan, &columnSpan);
-    gridLayout->removeWidget(pos3D);
-    delete pos3D;
-
+    pos3D->setStyleSheet("background-color: rgb(0, 102, 204); border-style: outset; border-width: 2px; border-radius: 20px; border-color: rgb(0, 0, 180);");
     Widget3D *threeDWidget = new Widget3D(parentContainer);
 
     gridLayout->addWidget(threeDWidget, row, column, rowSpan, columnSpan);
-    QTimer *videoTimer = new QTimer(this);
 
     rovSeries = threeDWidget->pointROV;
     dsSeries = threeDWidget->pointDS;
     data << QVector3D(2.0f, 2.0f, 2.0f);
     rovSeries->dataProxy()->resetArray(&data);
+
+    // Таймер для визуализации крена, дифферента и 3Д точки
+    // привязка ко времени видео-файла
+    // каждый кадр накапливается счетчик для изменения положения
+
+    QTimer *videoTimer = new QTimer(this);
 
     connect(videoTimer, &QTimer::timeout, this, [this]() {
         if (player->playbackState() == QMediaPlayer::PlayingState && flagMarker == 1) {
@@ -121,8 +127,8 @@ Widget::Widget(QWidget *parent)
             rollRov->setRotation(-a);
 
             float rovX = 2.0f - 0.5f * qSin(timeCounter * 0.3f);
-            float rovY = 2.0f  - 0.5f * qCos(timeCounter * 0.3f);
-            float rovZ = 2.0f  - 0.3f * timeCounter;
+            float rovY = 2.0f - 0.5f * qCos(timeCounter * 0.3f);
+            float rovZ = 2.0f - 0.3f * timeCounter;
 
             data << QVector3D(rovX, rovY, rovZ);
             rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(rovX, rovY, rovZ)));
@@ -130,6 +136,8 @@ Widget::Widget(QWidget *parent)
     });
 
     videoTimer->start(50);
+
+    // Обработка нажатия кнопки следующего видео
 
     connect(nextVideo, &QPushButton::clicked, [this](){
         if (n < k) n += 1;
@@ -141,6 +149,8 @@ Widget::Widget(QWidget *parent)
         player->setVideoOutput(Video);
     });
 
+    // Обработка нажатия кнопки предыдущего видео
+
     connect(prevVideo, &QPushButton::clicked, [this](){
         if (n > 1) n -= 1;
         timeCounter = 0.0;
@@ -151,16 +161,26 @@ Widget::Widget(QWidget *parent)
         player->setVideoOutput(Video);
     });
 
+    // Обработка нажатия кнопки старт
+
     connect(startBtn, &QPushButton::clicked,[this](){
         startFlag = 1;
         numberVideo->setText(QString::number(n) + "/" + QString::number(k));
+        txtCurrentPitch->setPlainText("0.0°");
+        txtCurrentRoll->setPlainText("0.0°");
+        pitchRov->setRotation(0);
+        rollRov->setRotation(0);
         player->play();
         player->setVideoOutput(Video);
     });
 
+    // Обработка нажатия кнопки стоп
+
     connect(stopBtn, &QPushButton::clicked,[this](){
         player->pause();
     });
+
+    // Обработка слайдера
 
     connect(player, &QMediaPlayer::metaDataChanged, [this]() {
         horizontalSlider->setSliderPosition(0);
@@ -174,6 +194,8 @@ Widget::Widget(QWidget *parent)
     connect(horizontalSlider, &QSlider::sliderMoved, [this]() {
         player->setPosition(horizontalSlider->sliderPosition());
     });
+
+    // Обработка нажатия кнопки режима калибровки
 
     connect(calibBtn, &QPushButton::clicked, [this](){
         flagMarker = 0;
@@ -191,6 +213,8 @@ Widget::Widget(QWidget *parent)
         markerBtn->setText("Marker");
         rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
     });
+
+    // Обработка нажатия кнопки режима маркера
 
     connect(markerBtn, &QPushButton::clicked, [this](){
         flagMarker = 1;
@@ -211,6 +235,8 @@ Widget::Widget(QWidget *parent)
     markerBtn->setEnabled(false);
     markerBtn->setText("Marker");
 
+    // Выводим статус видео по завершении
+
     connect(player, &QMediaPlayer::mediaStatusChanged, this, [this](QMediaPlayer::MediaStatus status) {
         if (status == QMediaPlayer::EndOfMedia && flagMarker == 0)
         {
@@ -221,9 +247,11 @@ Widget::Widget(QWidget *parent)
         }
         else if (status == QMediaPlayer::EndOfMedia && flagMarker == 1)
         {
-            valueRMS->setText("Обработка маркера завершен");
+            valueRMS->setText("Обработка маркера завершена");
         }
     });
+
+    // Выводим статус видео при проигрывании
 
     connect(player, &QMediaPlayer::playbackStateChanged, this, [this](QMediaPlayer::PlaybackState state) {
         if (state == QMediaPlayer::PlayingState && flagMarker == 0)
@@ -237,7 +265,7 @@ Widget::Widget(QWidget *parent)
     });
 
     Video->show();
-    qDebug() << Video->size();
+
 }
 
 Widget::~Widget() {}
