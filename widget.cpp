@@ -1,298 +1,192 @@
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "widget.h"
 #include "widget3d.h"
 #include <QDebug>
 #include <QDir>
 #include <QTimer>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
 {
     setupUi(this);
 
-    // Создаем задний фон
-
-    QImageReader::setAllocationLimit(256);
+    //QImageReader::setAllocationLimit(256);
     QPixmap pix("land.png");
     pix = pix.scaled(this->size(), Qt::KeepAspectRatioByExpanding);
     QPalette palette;
     palette.setBrush(QPalette::Window, pix);
     this->setPalette(palette);
+    label->setStyleSheet("color: white; font-size: 24px;");
 
-    player = new QMediaPlayer;  // наш плейер
-
-    k = fileSize(folder);       // кол-во файлов в папке
-
-    numberVideo->setText(QString::number(n) + "/" + QString::number(k));
-
-    player->setSource(QUrl(folder + QString::number(n) + ".MOV"));
-
-    // Формируем отображение крена и дифферента и добавляем картинки аппарата
     // PITCH
-
     scene1 = new QGraphicsScene(pitchView);
     pitchView->setScene(scene1);
     pitchView->setStyleSheet("background: transparent; border: none;");
     pitchView->setRenderHint(QPainter::Antialiasing);
-
     QGraphicsEllipseItem *circle = new QGraphicsEllipseItem();
-    circle->setRect(0, 0, 500, 500); // Размер окружности
-    circle->setPos(2.5, 2.5); // Центрируем
-
-    QPen circlePen(Qt::black); // Цвет контура
-    circle->setBrush(QBrush(QColor(0, 150, 255, 150))); // Заливка контура
-    circlePen.setWidth(2); // Толщина линии
+    circle->setRect(0, 0, 500, 500);
+    circle->setPos(2.5, 2.5);
+    QPen circlePen(Qt::black);
+    circle->setBrush(QBrush(QColor(0, 150, 255, 150)));
+    circlePen.setWidth(2);
     circle->setPen(circlePen);
     scene1->addItem(circle);
-
     pitchDial = scene1->addPixmap(QPixmap("anglesPitch.png"));
-    pitchRov = scene1->addPixmap(QPixmap("pitchRov.png"));
-
+    pitchRov = scene1->addPixmap(QPixmap("pitch.png"));
     pitchDial->setTransform(QTransform::fromScale(0.5, 0.5));
-    pitchRov->setTransform(QTransform::fromScale(0.3, 0.3));
-    pitchRov->setPos(85, 200);
+    pitchRov->setTransform(QTransform::fromScale(0.45, 0.45));
+    pitchRov->setPos(50, 190);
+    QGraphicsEllipseItem *textBackground = new QGraphicsEllipseItem();
+    textBackground->setBrush(QBrush(QColor(98, 160, 234, 180)));
+    textBackground->setPen(QPen(Qt::darkGray, 1));
+    scene1->addItem(textBackground);
     txtCurrentPitch = scene1->addText(QString::number(a, 'f', 1) + "°", QFont("Calibri", 24));
-    txtCurrentPitch->setDefaultTextColor(QColor(0, 0, 0));
+    txtCurrentPitch->setDefaultTextColor(Qt::black);
+    QRectF textBounds = txtCurrentPitch->boundingRect();
+    textBackground->setRect(textBounds.adjusted(-15, -8, 15, 8));
 
     QTransform t;
     t.translate(pitchDial->pixmap().width()/4-20, pitchDial->pixmap().height()/4-22);
+    textBackground->setTransform(t);
     txtCurrentPitch->setTransform(t);
     pitchRov->setTransformOriginPoint(pitchRov->pixmap().width()/2, pitchRov->pixmap().height()/2);
 
-
-    //ROLL
-
+    // ROLL
     scene2 = new QGraphicsScene(rollView);
     rollView->setScene(scene2);
     rollView->setStyleSheet("background: transparent; border: none;");
     rollView->setRenderHint(QPainter::Antialiasing);
-
     QGraphicsEllipseItem *circle1 = new QGraphicsEllipseItem();
     circle1->setRect(0, 0, 500, 500);
     circle1->setPos(2.5, 2.5);
-
     QPen circlePen1(Qt::black);
     circle1->setBrush(QBrush(QColor(0, 150, 255, 150)));
     circlePen1.setWidth(2);
     circle1->setPen(circlePen1);
     scene2->addItem(circle1);
-
     rollDial = scene2->addPixmap(QPixmap("anglesRoll.png"));
-    rollRov = scene2->addPixmap(QPixmap("rollRov.png"));
-
+    rollRov = scene2->addPixmap(QPixmap("roll.png"));
     rollDial->setTransform(QTransform::fromScale(0.5,0.5));
-    rollRov->setTransform(QTransform::fromScale(0.4, 0.4));
-    rollRov->setPos(69, 155);
+    rollRov->setTransform(QTransform::fromScale(0.5, 0.5));
+    rollRov->setPos(60, 175);
     txtCurrentRoll = scene2->addText(QString::number(a, 'f', 1) + "°", QFont("Times New Roman", 24));
     txtCurrentRoll->setDefaultTextColor(Qt::black);
-
     QTransform t1;
     t1.translate(rollDial->pixmap().width()/4-20, rollDial->pixmap().height()/4-22);
     txtCurrentRoll->setTransform(t1);
     rollRov->setTransformOriginPoint(rollRov->pixmap().width()/2, rollRov->pixmap().height()/2);
 
-    // Подключение виджета 3Д положения ПА относительно док-станции
-
     QWidget *parentContainer = pos3D->parentWidget();
-
     int index = gridLayout->indexOf(pos3D);
     int row, column, rowSpan, columnSpan;
-
     gridLayout->getItemPosition(index, &row, &column, &rowSpan, &columnSpan);
-    pos3D->setStyleSheet("background-color: rgb(0, 102, 204); border-style: outset; border-width: 2px; border-radius: 20px; border-color: rgb(0, 0, 180);");
-    Widget3D *threeDWidget = new Widget3D(parentContainer);
-
+    pos3D->setStyleSheet("background-color: rgb(0, 102, 204); border-style: outset;"
+                         " border-width: 2px; border-radius: 20px;"
+                         " border-color: rgb(0, 0, 180);");
+    threeDWidget = new Widget3D(parentContainer);  // Сохраняем как член класса
     gridLayout->addWidget(threeDWidget, row, column, rowSpan, columnSpan);
 
-    rovSeries = threeDWidget->pointROV;
-    dsSeries = threeDWidget->pointDS;
-    data << QVector3D(2.0f, 2.0f, 2.0f);
-    rovSeries->dataProxy()->resetArray(&data);
+    threeDWidget->updateROVPosition(1.0f, 1.0f, 1.0f, 0.0f);
+    threeDWidget->updateMarkerPosition(0.0f, 0.0f, 0.0f);
 
-    // Таймер для визуализации крена, дифферента и 3Д точки
-    // привязка ко времени видео-файла
-    // каждый кадр накапливается счетчик для изменения положения
-
-    QTimer *videoTimer = new QTimer(this);
-
-    connect(videoTimer, &QTimer::timeout, this, [this]()
-    {
-        if (player->playbackState() == QMediaPlayer::PlayingState && flagMarker == 1) {
-            timeCounter += 0.05;
-
-            a = 10.0 * qSin(timeCounter);
-            txtCurrentPitch->setPlainText(QString::number(a, 'f', 1) + "°");
-            pitchRov->setRotation(-a);
-
-            a = 5.0 * qSin(timeCounter);
-            txtCurrentRoll->setPlainText(QString::number(a, 'f', 1) + "°");
-            rollRov->setRotation(-a);
-
-            float rovX = 2.0f - 0.5f * qSin(timeCounter * 0.3f);
-            float rovY = 2.0f - 0.5f * qCos(timeCounter * 0.3f);
-            float rovZ = 2.0f - 0.3f * timeCounter;
-
-            data << QVector3D(rovX, rovY, rovZ);
-            rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(rovX, rovY, rovZ)));
-        }
-    });
-
-    videoTimer->start(50);
-
-    // Обработка нажатия кнопки следующего видео
-
-    connect(nextVideo, &QPushButton::clicked, [this]()
-    {
-        if (n < k) n += 1;
-        else n = 1;
-        timeCounter = 0.0;
-        rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
-        numberVideo->setText(QString::number(n) + "/" + QString::number(k));
-        player->setSource(QUrl(folder + QString::number(n) + ".MOV"));
-        player->play();
-        player->setVideoOutput(Video);
-    });
-
-    // Обработка нажатия кнопки предыдущего видео
-
-    connect(prevVideo, &QPushButton::clicked, [this]()
-    {
-        if (n > 1) n -= 1;
-        else n = k;
-        timeCounter = 0.0;
-        rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
-        numberVideo->setText(QString::number(n) + "/" + QString::number(k));
-        player->setSource(QUrl(folder + QString::number(n) + ".MOV"));
-        player->play();
-        player->setVideoOutput(Video);
-    });
-
-    // Обработка нажатия кнопки старт
-
-    connect(startBtn, &QPushButton::clicked,[this]()
-    {
-        numberVideo->setText(QString::number(n) + "/" + QString::number(k));
-        if (endVideo == 1)
-        {
-            endVideo = 0;
-            timeCounter = 0.0;
-            rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
-            txtCurrentPitch->setPlainText("0.0°");
-            txtCurrentRoll->setPlainText("0.0°");
-            pitchRov->setRotation(0);
-            rollRov->setRotation(0);
-        }
-        player->play();
-        player->setVideoOutput(Video);
-    });
-
-    // Обработка нажатия кнопки стоп
-
-    connect(stopBtn, &QPushButton::clicked,[this]()
-    {
-        player->pause();
-    });
-
-    // Обработка слайдера
-
-    connect(player, &QMediaPlayer::metaDataChanged, [this]()
-    {
-        horizontalSlider->setSliderPosition(0);
-        horizontalSlider->setMaximum(player->duration());
-    });
-
-    connect(player, &QMediaPlayer::positionChanged, [this]()
-    {
-        horizontalSlider->setSliderPosition(player->position());
-    });
-
-    connect(horizontalSlider, &QSlider::sliderMoved, [this]()
-    {
-        player->setPosition(horizontalSlider->sliderPosition());
-    });
-
-    // Обработка нажатия кнопки режима калибровки
-
-    connect(calibBtn, &QPushButton::clicked, [this]()
-    {
-        flagMarker = 0;
-        folder= "Calib/";
-        k = fileSize(folder);
-        player->stop();
-        player->setSource(QUrl(folder + QString::number(1) + ".MOV"));
-        timeCounter = 0.0;
-        a = 0.0;
-        txtCurrentPitch->setPlainText("0.0°");
-        txtCurrentRoll->setPlainText("0.0°");
-        pitchRov->setRotation(0);
-        rollRov->setRotation(0);
-        markerBtn->setEnabled(false);
-        markerBtn->setText("Marker");
-        rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
-    });
-
-    // Обработка нажатия кнопки режима маркера
-
-    connect(markerBtn, &QPushButton::clicked, [this]()
-    {
-        flagMarker = 1;
-        folder = "Marker/";
-        k = fileSize(folder);
-        player->stop();
-        player->setSource(QUrl(folder + QString::number(1) + ".MOV"));
-        timeCounter = 0.0;
-        a = 0.0;
-        txtCurrentPitch->setPlainText("0.0°");
-        txtCurrentRoll->setPlainText("0.0°");
-        pitchRov->setRotation(0);
-        rollRov->setRotation(0);
-        rovSeries->dataProxy()->setItem(0, QScatterDataItem(QVector3D(2.0f, 2.0f, 2.0f)));
-    });
-
-
-    markerBtn->setEnabled(false);
-    markerBtn->setText("Marker");
-
-    // Выводим статус видео по завершении
-
-    connect(player, &QMediaPlayer::mediaStatusChanged, this, [this](QMediaPlayer::MediaStatus status)
-    {
-        if (status == QMediaPlayer::EndOfMedia && flagMarker == 0)
-        {
-            markerBtn->setEnabled(true);
-            markerBtn->setText("Marker");
-
-            valueRMS->setText("Калибровка завершена: RMS = 0.6 (отлично)");
-        }
-        else if (status == QMediaPlayer::EndOfMedia && flagMarker == 1)
-        {
-            endVideo = 1;
-            valueRMS->setText("Обработка маркера завершена");
-        }
-    });
-
-    // Выводим статус видео при проигрывании
-
-    connect(player, &QMediaPlayer::playbackStateChanged, this, [this](QMediaPlayer::PlaybackState state)
-    {
-        if (state == QMediaPlayer::PlayingState && flagMarker == 0)
-        {
-            valueRMS->setText("Выполняется калибровка...");
-        }
-        else if (state == QMediaPlayer::PlayingState && flagMarker == 1)
-        {
-            valueRMS->setText("Обработка маркера...");
-        }
-    });
+    QHeaderView* header = tableWidget->horizontalHeader();
+    header->setSectionResizeMode(QHeaderView::Stretch);
+    header->setStretchLastSection(false);
+    QHeaderView* vHeader = tableWidget->verticalHeader();
+    vHeader->setSectionResizeMode(QHeaderView::Stretch);
 
     Video->show();
 
+    Video->setAlignment(Qt::AlignCenter);
+    Video->setScaledContents(false);
+    Video->setMinimumSize(640, 480);
+    Video->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    streamLabel = new QLabel(Video);
+    streamLabel->setGeometry(Video->rect());
+    streamLabel->setScaledContents(true);
+    streamLabel->hide();
+
+    // HTTP
+    httpManager = new QNetworkAccessManager(this);
+    httpTimer = new QTimer(this);
+    connect(httpTimer, &QTimer::timeout, this, [this]() {
+        // Данные
+        QNetworkReply *d = httpManager->get(QNetworkRequest(QUrl("http://10.42.0.10:8080/data")));
+        connect(d, &QNetworkReply::finished, this, [this, d]() {
+            if (d->error() == QNetworkReply::NoError) {
+                QJsonObject obj = QJsonDocument::fromJson(d->readAll()).object();
+                QJsonArray markers = obj["markers"].toArray();
+
+                double x = 0, y = 0, z = 0, roll = 0, pitch = 0, yaw = 0;
+                int markerId = -1;
+
+                if (!markers.isEmpty()) {
+                    QJsonObject m = markers[0].toObject();
+                    x = m["x"].toDouble();
+                    y = m["y"].toDouble();
+                    z = m["z"].toDouble();
+                    roll = m["roll"].toDouble();
+                    pitch = m["pitch"].toDouble();
+                    yaw = m["yaw"].toDouble();
+                    markerId = m["id"].toInt();
+                }
+
+                // Лейбл детекции
+                label->setText(markerId >= 0 ? QString("Маркер ID: %1").arg(markerId) : "Маркер не найден");
+                label->setStyleSheet("color: white; font-size: 24px;");
+
+                auto setCell = [this](int row, int col, QString val) {
+                    QTableWidgetItem *item = new QTableWidgetItem(val);
+                    item->setTextAlignment(Qt::AlignCenter);
+                    item->setBackground(QColor(98, 160, 234, 255));
+                    item->setForeground(QColor(255, 255, 255));
+                    QFont font;
+                    font.setPointSize(24);
+                    item->setFont(font);
+                    tableWidget->setItem(row, col, item);
+                };
+
+                setCell(0, 0, QString::number(x, 'f', 2));
+                setCell(0, 1, QString::number(y, 'f', 2));
+                setCell(0, 2, QString::number(z, 'f', 2));
+                setCell(0, 3, QString::number(yaw, 'f', 1));
+
+                txtCurrentPitch->setPlainText(QString::number(pitch,'f',1)+"°");
+                txtCurrentRoll->setPlainText(QString::number(roll,'f',1)+"°");
+                pitchRov->setRotation(-pitch);
+                rollRov->setRotation(roll);
+
+                if (threeDWidget) {
+                    threeDWidget->updateROVPosition(x, z, y, yaw);
+                }
+            }
+            d->deleteLater();
+        });
+        // Видео
+        QNetworkReply *v = httpManager->get(QNetworkRequest(QUrl("http://10.42.0.10:8080/video")));
+        connect(v, &QNetworkReply::finished, this, [this, v]() {
+            if (v->error() == QNetworkReply::NoError) {
+                QByteArray jpeg = v->readAll();
+                if (jpeg.size() > 0) {
+                    streamFrame.loadFromData(jpeg);
+                    if (!streamFrame.isNull()) {
+                        Video->setPixmap(streamFrame.scaled(Video->size(), Qt::KeepAspectRatio));
+                    }
+                }
+            }
+            v->deleteLater();
+        });
+    });
+    httpTimer->start(33);
 }
 
 Widget::~Widget() {}
 
-int Widget::fileSize(QString folder)
-{
+int Widget::fileSize(QString folder) {
     QDir dir(folder);
-    QStringList items = dir.entryList(QDir::NoDotAndDotDot | QDir::AllEntries);
-    return items.count();
+    return dir.entryList(QDir::NoDotAndDotDot | QDir::AllEntries).count();
 }
